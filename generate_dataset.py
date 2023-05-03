@@ -52,7 +52,7 @@ def generate_images(run_sd,caption_max_index=2,num_images_per_caption=5):
             # Convert back to np array 
             ri = np.array(ri)
             # Store in the dataset as a torch tensor 
-            ri = ri.astype(np.float32)/255  
+            ri = ri.astype(np.float32)
             data.append((torch.from_numpy(ri),caption)) 
       return data 
 
