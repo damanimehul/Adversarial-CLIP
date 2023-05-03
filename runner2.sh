@@ -1,0 +1,2 @@
+python main.py --name target-v1 --wandb  --device cuda --dataset 1000 --log_freq 50 --lr 1e-3 --epochs 1000 --batch_size 128
+python main.py --name target-v2 --wandb  --device cuda --dataset 1000 --log_freq 50 --lr 1e-2 --epochs 1000 --batch_size 128

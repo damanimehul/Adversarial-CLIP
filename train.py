@@ -28,10 +28,10 @@ class BaseTrainer():
 
     def train_setup(self):
         self.v = torch.zeros((3,224,224))
-        self.optimizer = torch.optim.SGD([self.v],lr=self.lr)
         if self.device == 'cuda':
             self.v = self.v.cuda()
         self.v.requires_grad = True
+        self.optimizer = torch.optim.SGD([self.v],lr=self.lr)
         self.loss_criterion = torch.nn.MSELoss() 
         all_captions = [i for i in MSCOCO_CLASSES]
         with torch.no_grad():
@@ -141,7 +141,6 @@ class TargetClassTrainer(BaseTrainer):
                 target_accuracies.append(target_accuracy)
                 distance_to_targets.append(distance_to_target)
                 self.curr_iter +=1
-                print(self.v[0,0,0])
             self.logger.update(iter=self.curr_epoch,log_dict={'loss':np.mean(losses),'train classification accuracy':np.mean(train_accuracies), 
                                                               'Classified as target':np.mean(target_accuracies), 'Average similarity with target':np.mean(distance_to_targets)})
             if i % self.log_freq == 0:
