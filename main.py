@@ -34,7 +34,7 @@ if __name__=='__main__':
         train_data,test_data = make_dataset(name=args.dname,caption_max_index=args.caption_max_index,
                                             num_images_per_caption=args.num_images_per_caption,test_size=args.test_size)
         
-    if args.trainer is not None:
+    if args.trainer is not None and args.trainer!='none':
         train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
         test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=len(test_data), shuffle=True)
         if args.device == 'cuda':
