@@ -1,7 +1,7 @@
 import argparse 
 import torch 
 from generate_dataset import load_dataset, make_dataset, ImageCaptionDataset
-from train import TargetClassTrainer 
+from train import TargetClassTrainer, MaxEmbeddingTrainer
 from utils import WandbLogger, preprocess_dataset
 from transformers import AutoTokenizer,AutoProcessor,CLIPTextModelWithProjection,CLIPVisionModelWithProjection
 import os 
@@ -61,7 +61,11 @@ if __name__=='__main__':
             trainer = TargetClassTrainer(device=args.device,dataloader=train_dataloader,test_dataloader=test_dataloader,logger=logger,text_model=text_model, visual_model=vision_model, 
                                          text_tokenizer=text_tokenizer, vision_processor=vision_processor,num_iters=args.num_iters,epochs=args.epochs,lr=args.lr,
                                          log_freq=args.log_freq,target_class=args.target_class)
-            
+        elif args.trainer == 'max_embedding_trainer':
+            trainer = MaxEmbeddingTrainer(device=args.device,dataloader=train_dataloader,test_dataloader=test_dataloader,logger=logger,text_model=text_model, visual_model=vision_model, 
+                                         text_tokenizer=text_tokenizer, vision_processor=vision_processor,num_iters=args.num_iters,epochs=args.epochs,lr=args.lr,
+                                         log_freq=args.log_freq)
+
         perturbations = trainer.train()
         with open('results/{}/{}'.format(args.name,'v.pickle'), 'wb') as f:
             pickle.dump(perturbations, f)
