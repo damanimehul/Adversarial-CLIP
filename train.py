@@ -27,10 +27,11 @@ class BaseTrainer():
             self.maxes = self.maxes.cuda()
 
     def train_setup(self):
-        self.v = torch.zeros((3,224,224),requires_grad=True)
+        self.v = torch.zeros((3,224,224))
         self.optimizer = torch.optim.SGD([self.v],lr=self.lr)
         if self.device == 'cuda':
             self.v = self.v.cuda()
+        self.v.requires_grad = True
         self.loss_criterion = torch.nn.MSELoss() 
         all_captions = [i for i in MSCOCO_CLASSES]
         with torch.no_grad():
