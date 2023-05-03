@@ -3,6 +3,7 @@ import torch
 import wandb  
 import time 
 import numpy as np 
+import csv
 
 MEANS = torch.tensor([
         0.48145466,
@@ -14,6 +15,8 @@ STDS = torch.tensor([
         0.27577711
         ]) 
 
+MINS = (torch.zeros_like(MEANS) - MEANS)/STDS 
+MAXES = (torch.ones_like(MEANS) - MEANS)/STDS
 
 def visualize_images(dataloader,num_samples=10):
     for i in range(len(batch)//num_samples):
@@ -48,12 +51,15 @@ def norm(im):
 
 ## Setup a wandb logger class
 class WandbLogger():
-    def __init__(self,use_wandb=False,args={}):
+    def __init__(self,use_wandb=False,args={},directory=None,max_epochs=1000):
         self.use_wandb = use_wandb
         if self.use_wandb:
             self.args = args
             name = self.args.name + time.strftime("_%Y-%m-%d") 
             self.run = wandb.init(project='adversarial-clip',name=name,config=args)
+        self.max_epochs = max_epochs
+        self.directory = directory
+        self.csv_data = {i:{} for i in range(max_epochs)}
         
     def update(self,iter,log_dict):
         if self.use_wandb:
@@ -62,19 +68,31 @@ class WandbLogger():
             for k,v in log_dict.items():
                 # Check if type v is list 
                 if isinstance(v,list):
+                    new_log_dict[k] = [] 
                     for element in v:
-                        new_log_dict[k] = wandb.Image(element)
+                        new_log_dict[k].append(wandb.Image(element))
                 else :
                     new_log_dict[k] = v
-
+                    self.csv_data[iter][k] = v
             self.run.log(new_log_dict,step=iter)
+
+    def write_csv(self):
+        path = self.directory+'/'+'results.csv'
+        keys = list(self.csv_data[0].keys()) 
+        keys.insert(0,'epoch')
+        with open(path, mode='a', newline='') as file:
+            writer = csv.writer(file) 
+            writer.writerow(keys)
+            for i in range(self.max_epochs):
+                all_vals =[i] 
+                for k,v in self.csv_data[i].items():
+                    all_vals.append(v)
+                writer.writerow(all_vals) 
 
 def process_img(img):
     # Converts torch image to np image of shape 224,224,3 and rgb values between 0 and 1
     img = denorm(torch.squeeze(img)) 
     img = img.numpy()
     img = np.reshape(img,(224,224,3)) 
-    reshaped_img = np.reshape(img,-1)
-    if max(reshaped_img) > 1:
-        img = img/255
+    img = img/255
     return img 
