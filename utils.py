@@ -4,7 +4,7 @@ import wandb
 import time 
 import numpy as np 
 import csv
-
+from copy import deepcopy 
 MEANS = torch.tensor([
         0.48145466,
         0.4578275,
@@ -95,4 +95,23 @@ def process_img(img):
     img = img.numpy()
     img = np.reshape(img,(224,224,3)) 
     img = img/255
-    return img 
+    return img
+
+def preprocess_dataset(train_data,test_data):
+    new_data =[] 
+    for i in range(len(train_data)):
+        img,cap = train_data[i]
+        maxes = torch.max(img,dim=0) 
+        if not maxes.values[0,0] <1:
+            new_data.append((img,cap))
+    train_data.data = deepcopy(new_data)
+    new_test_data =[]
+    for i in range(len(test_data)):
+        img,cap = test_data[i]
+        maxes = torch.max(img,dim=0) 
+        if not maxes.values[0,0] <1:
+            new_test_data.append((img,cap))
+    test_data.data = deepcopy(new_test_data)
+    print('Removed empty Images due to NSFW filter, New Train Data Size',len(train_data)) 
+    print('Removed empty Images due to NSFW filter, New Test Data Size',len(test_data))
+    return train_data,test_data

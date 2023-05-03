@@ -65,11 +65,11 @@ def build_stable_diffusion():
 
 def load_dataset(name='dataset'): 
   # Load the train dataset
-  with open('train_{}.pickle'.format(name), 'rb') as f:
+  with open('datasets/train_{}.pickle'.format(name), 'rb') as f:
       train_dataset = pickle.load(f)
 
   # Load the test dataset
-  with open('test_{}.pickle'.format(name), 'rb') as f:
+  with open('datasets/test_{}.pickle'.format(name), 'rb') as f:
       test_dataset = pickle.load(f)
   return train_dataset, test_dataset
 
@@ -80,11 +80,11 @@ def make_dataset(name='dataset',caption_max_index=2,num_images_per_caption=5,tes
     train_dataset = ImageCaptionDataset(train_data)
     test_dataset = ImageCaptionDataset(test_data)
     # Save the train dataset
-    with open('train_{}.pickle'.format(name), 'wb') as f:
+    with open('datasets/train_{}.pickle'.format(name), 'wb') as f:
         pickle.dump(train_dataset, f)
 
     # Save the test dataset
-    with open('test_{}.pickle'.format(name), 'wb') as f:
+    with open('datasets/test_{}.pickle'.format(name), 'wb') as f:
         pickle.dump(test_dataset, f)
 
     return train_dataset, test_dataset

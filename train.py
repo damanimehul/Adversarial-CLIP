@@ -113,6 +113,8 @@ class TargetClassTrainer(BaseTrainer):
                 # Get a batch of images and captions 
                 batch = next(iter(self.dataloader))
                 imgs,captions = batch
+                if self.device == 'cuda':
+                    imgs = imgs.cuda()
                 # Preprocess images and captions 
                 vision_inputs = self.get_vision_preprocessing(imgs) 
                 vision_inputs['pixel_values'] += self.v 
@@ -145,6 +147,8 @@ class TargetClassTrainer(BaseTrainer):
     def evaluate(self):
         batch = next(iter(self.test_dataloader))
         imgs,captions = batch
+        if self.device == 'cuda':
+            imgs = imgs.cuda()
         loss = 0 
         log_dict = {'original_images':[],'generations':[]} 
         class_accuracies, target_classified, target_dist = [] , [], [] 
@@ -153,7 +157,7 @@ class TargetClassTrainer(BaseTrainer):
             # Preprocess images and captions 
             vision_inputs = self.get_vision_preprocessing(i) 
             if j<8:
-                log_dict['original_images'].append(self.get_image(vision_inputs['pixel_values'])) 
+                log_dict['original_images'].append(self.get_image(vision_inputs['pixel_values'].clone().cpu())) 
             vision_inputs['pixel_values'] += self.v 
             vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, i, :, :], MINS[i], MAXES[i]) for i in range(3)], dim=1)
             if j<8:
@@ -168,7 +172,7 @@ class TargetClassTrainer(BaseTrainer):
 
         class_accuracies = np.mean(class_accuracies)
         log_dict['test_loss'] = loss.item()/len(imgs)
-        log_dict['v'] = [self.get_image(self.v.clone())] 
+        log_dict['v'] = [self.get_image(self.v.clone().cpu())] 
         log_dict['test classification accuracy'] = class_accuracies
         log_dict['Test-Classified as target'] = np.mean(target_classified)
         log_dict['Test-Average similarity with target'] = np.mean(target_dist)

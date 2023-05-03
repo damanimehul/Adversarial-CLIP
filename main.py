@@ -2,7 +2,7 @@ import argparse
 import torch 
 from generate_dataset import load_dataset, make_dataset, ImageCaptionDataset
 from train import TargetClassTrainer 
-from utils import WandbLogger
+from utils import WandbLogger, preprocess_dataset
 from transformers import AutoTokenizer,AutoProcessor,CLIPTextModelWithProjection,CLIPVisionModelWithProjection
 import os 
 import pickle 
@@ -33,14 +33,13 @@ if __name__=='__main__':
     else:
         train_data,test_data = make_dataset(name=args.dname,caption_max_index=args.caption_max_index,
                                             num_images_per_caption=args.num_images_per_caption,test_size=args.test_size)
-        
+    
+    train_data,test_data = preprocess_dataset(train_data,test_data)
+    print('Preprocessed dataset by removing NSFW samples') 
     if args.trainer is not None and args.trainer!='none':
         train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
-        test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=len(test_data), shuffle=True)
-        if args.device == 'cuda':
-            train_dataloader = train_dataloader.to(args.device)
-            test_dataloader = test_dataloader.to(args.device)
-
+        test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=min(256,len(test_data)), shuffle=True)
+        
         logger = WandbLogger(args.wandb,args,'results/{}'.format(args.name),args.epochs)
 
         # Make directory 
