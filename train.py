@@ -20,6 +20,11 @@ class BaseTrainer():
         self.num_iters = num_iters
         self.lr = lr
         self.epochs = epochs
+        self.mins = MINS
+        self.maxes = MAXES
+        if self.device == 'cuda':
+            self.mins = self.mins.cuda()
+            self.maxes = self.maxes.cuda()
 
     def train_setup(self):
         self.v = torch.zeros((3,224,224),requires_grad=True)
@@ -122,7 +127,7 @@ class TargetClassTrainer(BaseTrainer):
                 if self.device == 'cuda':
                     vision_inputs = {k:v.cuda() for k,v in vision_inputs.items()}
                 vision_inputs['pixel_values'] += self.v 
-                vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, k, :, :], MINS[k], MAXES[k]) for k in range(3)], dim=1)
+                vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, k, :, :], self.mins[k], self.maxes[k]) for k in range(3)], dim=1)
                 vision_embeddings = self.get_vision_embeddings(vision_inputs)
                 train_accuracy,target_accuracy,distance_to_target = self.get_classification_accuracy(vision_embeddings,captions)
                 target_embeddings = self.target_embeddings.repeat(vision_embeddings.shape[0],1)
@@ -165,7 +170,7 @@ class TargetClassTrainer(BaseTrainer):
             if j<8:
                 log_dict['original_images'].append(self.get_image(vision_inputs['pixel_values'].clone().cpu())) 
             vision_inputs['pixel_values'] += self.v 
-            vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, i, :, :], MINS[i], MAXES[i]) for i in range(3)], dim=1)
+            vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, i, :, :], self.mins[i], self.maxes[i]) for i in range(3)], dim=1)
             if j<8:
                 log_dict['generations'].append(self.get_image(vision_inputs['pixel_values']))
             vision_embeddings = self.get_vision_embeddings(vision_inputs)
