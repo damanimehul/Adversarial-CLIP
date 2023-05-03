@@ -140,6 +140,7 @@ class TargetClassTrainer(BaseTrainer):
                 target_accuracies.append(target_accuracy)
                 distance_to_targets.append(distance_to_target)
                 self.curr_iter +=1
+                print(self.v[0,0,0])
             self.logger.update(iter=self.curr_epoch,log_dict={'loss':np.mean(losses),'train classification accuracy':np.mean(train_accuracies), 
                                                               'Classified as target':np.mean(target_accuracies), 'Average similarity with target':np.mean(distance_to_targets)})
             if i % self.log_freq == 0:
