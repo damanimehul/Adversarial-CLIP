@@ -42,7 +42,7 @@ def generate_images(run_sd,caption_max_index=2,num_images_per_caption=5):
     with torch.no_grad():
       data= []
       for i in range(caption_max_index):  
-          caption = get_caption(MSCOCO_CLASSES[i])
+          caption = MSCOCO_CLASSES[i]
           sd_images = run_sd(caption,num_images_per_prompt=num_images_per_caption).images   
           for i in sd_images: 
             ## Convert to PIL to downsample image

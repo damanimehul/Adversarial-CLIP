@@ -1,7 +1,7 @@
 import torch 
 from utils import MINS,MAXES,norm,denorm,process_img
 import numpy as np 
-from generate_dataset import MSCOCO_CLASSES, get_caption
+from generate_dataset import MSCOCO_CLASSES
 
 class BaseTrainer():
 
@@ -27,7 +27,7 @@ class BaseTrainer():
         if self.device == 'cuda':
             self.v = self.v.cuda()
         self.loss_criterion = torch.nn.MSELoss() 
-        all_captions = [get_caption(i) for i in MSCOCO_CLASSES]
+        all_captions = [i for i in MSCOCO_CLASSES]
         with torch.no_grad():
             self.all_embeddings = self.get_text_embeddings(all_captions)
         self.curr_iter = 0 
@@ -87,7 +87,7 @@ class TargetClassTrainer(BaseTrainer):
 
     def train_setup(self):
         super().train_setup()
-        input_caption = get_caption(self.target_class)
+        input_caption = self.target_class
         with torch.no_grad():
             self.target_embeddings = self.get_text_embeddings([input_caption])[0]
 
