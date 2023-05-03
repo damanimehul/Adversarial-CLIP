@@ -36,6 +36,8 @@ class BaseTrainer():
     def get_text_embeddings(self,inputs):
         # Get clip embeddings from a list of str inputs 
         preprocess_text = self.text_tokenizer(inputs, padding=True, return_tensors="pt")
+        if self.device == 'cuda':
+            preprocess_text = {k:v.cuda() for k,v in preprocess_text.items()}
         outputs = self.text_model(**preprocess_text) 
         return outputs.text_embeds 
 
@@ -117,6 +119,8 @@ class TargetClassTrainer(BaseTrainer):
                     imgs = imgs.cuda()
                 # Preprocess images and captions 
                 vision_inputs = self.get_vision_preprocessing(imgs) 
+                if self.device == 'cuda':
+                    vision_inputs = {k:v.cuda() for k,v in vision_inputs.items()}
                 vision_inputs['pixel_values'] += self.v 
                 vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, k, :, :], MINS[k], MAXES[k]) for k in range(3)], dim=1)
                 vision_embeddings = self.get_vision_embeddings(vision_inputs)
@@ -156,6 +160,8 @@ class TargetClassTrainer(BaseTrainer):
             caption = captions[j]
             # Preprocess images and captions 
             vision_inputs = self.get_vision_preprocessing(i) 
+            if self.device == 'cuda':
+                vision_inputs = {k:v.cuda() for k,v in vision_inputs.items()}
             if j<8:
                 log_dict['original_images'].append(self.get_image(vision_inputs['pixel_values'].clone().cpu())) 
             vision_inputs['pixel_values'] += self.v 

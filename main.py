@@ -54,10 +54,8 @@ if __name__=='__main__':
         vision_processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
         if args.device == 'cuda':
-            text_tokenizer = text_tokenizer.to(args.device)
             text_model = text_model.to(args.device)
             vision_model = vision_model.to(args.device)
-            vision_processor = vision_processor.to(args.device)
 
         if args.trainer == 'target_class_trainer':
             trainer = TargetClassTrainer(device=args.device,dataloader=train_dataloader,test_dataloader=test_dataloader,logger=logger,text_model=text_model, visual_model=vision_model, 
