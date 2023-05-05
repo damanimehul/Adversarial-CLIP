@@ -41,13 +41,15 @@ def denorm(im):
         return new_im 
 
 def norm(im): 
-    # Denormalize an image similar to clip-preprocessing
-    if len(im.shape) ==4:
-        assert im.shape[0] ==1 
-        im = im.squeeze(dim=0) 
-    new_im = (im/255 -  MEANS)/ STDS
-    new_im = new_im.permute(2,0,1)
-    return new_im
+    # Denormalize an image similar to clip-preprocessin
+    # if len(im.shape) ==4:
+    #     assert im.shape[0] ==1 
+    #     im = im.squeeze(dim=0) 
+    # new_im = (im/255 -  MEANS)/ STDS
+    im /= 255
+    im = (im - MEANS.view(1, 1, 1, 3)) / STDS.view(1, 1, 1, 3)
+    im = im.permute(0,3,1,2)
+    return im
 
 ## Setup a wandb logger class
 class WandbLogger():
@@ -89,8 +91,12 @@ class WandbLogger():
                     all_vals.append(v)
                 writer.writerow(all_vals) 
 
-def process_img(img):
+def process_img(img,no_norm=False):
     # Converts torch image to np image of shape 224,224,3 and rgb values between 0 and 1
+    if no_norm: 
+        img = img.numpy()
+        img = np.reshape(img,(224,224,3))
+        return img
     img = denorm(torch.squeeze(img)) 
     img = img.numpy()
     img = np.reshape(img,(224,224,3)) 

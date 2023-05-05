@@ -2,7 +2,7 @@ import torch
 from utils import MINS,MAXES,norm,denorm,process_img
 import numpy as np 
 from generate_dataset import MSCOCO_CLASSES
-
+from copy import deepcopy 
 class BaseTrainer():
 
     def __init__(self,device,dataloader,test_dataloader,logger,text_model, visual_model, text_tokenizer, 
@@ -27,7 +27,7 @@ class BaseTrainer():
             self.maxes = self.maxes.cuda()
 
     def train_setup(self):
-        self.v = torch.zeros((3,224,224))
+        self.v = torch.zeros((224,224,3))
         if self.device == 'cuda':
             self.v = self.v.cuda()
         self.v.requires_grad = True
@@ -36,6 +36,7 @@ class BaseTrainer():
         all_captions = [i for i in MSCOCO_CLASSES]
         with torch.no_grad():
             self.all_embeddings = self.get_text_embeddings(all_captions)
+            self.norm_embeddings = self.all_embeddings.clone()/torch.norm(self.all_embeddings,dim=1).unsqueeze(1)
         self.curr_iter = 0 
         self.curr_epoch = 0
 
@@ -64,17 +65,18 @@ class BaseTrainer():
     def evaluate(self):
         raise NotImplementedError
     
-    def get_image(self,inputs): 
+    def get_image(self,inputs,no_norm=False): 
         if self.device == 'cuda':
             img_proc = inputs.clone().cpu()
-            img_proc = process_img(img_proc)
+            img_proc = process_img(img_proc,no_norm)
         else :
-            img_proc = process_img(inputs)
+            img_proc = process_img(inputs,no_norm)
         return img_proc
     
     @torch.no_grad()
     def get_classification_accuracy(self,vision_embeddings,captions):
-        dot_products = torch.transpose(torch.matmul(self.all_embeddings,torch.transpose(vision_embeddings,0,1)),0,1) 
+        vision_embeddings /= torch.norm(vision_embeddings,dim=1).unsqueeze(1)
+        dot_products = torch.transpose(torch.matmul(self.norm_embeddings,torch.transpose(vision_embeddings,0,1)),0,1) 
         maxes = torch.argmax(dot_products,dim=1)
         maxes = maxes.cpu().numpy()
         caption_labels = np.array([MSCOCO_CLASSES.index(i) for i in captions]) 
@@ -101,7 +103,8 @@ class TargetClassTrainer(BaseTrainer):
 
     @torch.no_grad()
     def get_classification_accuracy(self,vision_embeddings,captions):
-        dot_products = torch.transpose(torch.matmul(self.all_embeddings,torch.transpose(vision_embeddings,0,1)),0,1) 
+        vision_embeddings /= torch.norm(vision_embeddings,dim=1).unsqueeze(1)
+        dot_products = torch.transpose(torch.matmul(self.norm_embeddings,torch.transpose(vision_embeddings,0,1)),0,1) 
         maxes = torch.argmax(dot_products,dim=1)
         maxes = maxes.cpu().numpy()
         caption_labels = np.array([MSCOCO_CLASSES.index(i) for i in captions]) 
@@ -124,11 +127,8 @@ class TargetClassTrainer(BaseTrainer):
                 imgs,captions = batch
                 if self.device == 'cuda':
                     imgs = imgs.cuda()
-                # Preprocess images and captions 
-                vision_inputs = self.get_vision_preprocessing(imgs) 
-                if self.device == 'cuda':
-                    vision_inputs = {k:v.cuda() for k,v in vision_inputs.items()}
-                vision_inputs['pixel_values'] += self.v 
+                imgs = imgs + self.v*255
+                vision_inputs = { 'pixel_values': norm(imgs)}  
                 vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, k, :, :], self.mins[k], self.maxes[k]) for k in range(3)], dim=1)
                 vision_embeddings = self.get_vision_embeddings(vision_inputs)
                 train_accuracy,target_accuracy,distance_to_target,sd = self.get_classification_accuracy(vision_embeddings,captions)
@@ -167,13 +167,11 @@ class TargetClassTrainer(BaseTrainer):
         class_accuracies, target_classified, target_dist, sim_dists = [] , [], [] , [] 
         for j,i in enumerate(imgs):
             caption = captions[j]
-            # Preprocess images and captions 
-            vision_inputs = self.get_vision_preprocessing(i) 
-            if self.device == 'cuda':
-                vision_inputs = {k:v.cuda() for k,v in vision_inputs.items()}
             if j<8:
-                log_dict['original_images'].append(self.get_image(vision_inputs['pixel_values'].clone().cpu())) 
-            vision_inputs['pixel_values'] += self.v 
+                log_dict['original_images'].append(self.get_image(norm(deepcopy(i)).clone().cpu())) 
+            # Preprocess images and captions 
+            imgs = imgs + self.v*255
+            vision_inputs = { 'pixel_values': norm(i)}   
             vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, i, :, :], self.mins[i], self.maxes[i]) for i in range(3)], dim=1)
             if j<8:
                 log_dict['generations'].append(self.get_image(vision_inputs['pixel_values']))
@@ -188,7 +186,7 @@ class TargetClassTrainer(BaseTrainer):
 
         class_accuracies = np.mean(class_accuracies)
         log_dict['test_loss'] = loss.item()/len(imgs)
-        log_dict['v'] = [self.get_image(self.v.clone().cpu())] 
+        log_dict['v'] = [self.get_image(self.v.clone().cpu(),no_norm=True)] 
         log_dict['test classification accuracy'] = class_accuracies
         log_dict['Test-Classified as target'] = np.mean(target_classified)
         log_dict['Test-Average similarity with target'] = np.mean(target_dist)
@@ -206,7 +204,8 @@ class MaxEmbeddingTrainer(BaseTrainer):
 
     @torch.no_grad()
     def get_classification_accuracy(self,vision_embeddings,captions):
-        dot_products = torch.transpose(torch.matmul(self.all_embeddings,torch.transpose(vision_embeddings,0,1)),0,1) 
+        vision_embeddings /= torch.norm(vision_embeddings,dim=1).unsqueeze(1)
+        dot_products = torch.transpose(torch.matmul(self.norm_embeddings,torch.transpose(vision_embeddings,0,1)),0,1) 
         maxes = torch.argmax(dot_products,dim=1)
         maxes = maxes.cpu().numpy()
         caption_labels = np.array([MSCOCO_CLASSES.index(i) for i in captions]) 
@@ -225,11 +224,8 @@ class MaxEmbeddingTrainer(BaseTrainer):
                 imgs,captions = batch
                 if self.device == 'cuda':
                     imgs = imgs.cuda()
-                # Preprocess images and captions 
-                vision_inputs = self.get_vision_preprocessing(imgs) 
-                if self.device == 'cuda':
-                    vision_inputs = {k:v.cuda() for k,v in vision_inputs.items()}
-                vision_inputs['pixel_values'] += self.v 
+                imgs = imgs + self.v*255
+                vision_inputs = { 'pixel_values': norm(imgs)}  
                 vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, k, :, :], self.mins[k], self.maxes[k]) for k in range(3)], dim=1)
                 vision_embeddings = self.get_vision_embeddings(vision_inputs)
                 train_accuracy,dist = self.get_classification_accuracy(vision_embeddings,captions)
@@ -264,13 +260,11 @@ class MaxEmbeddingTrainer(BaseTrainer):
         class_accuracies, distances = [] , [] 
         for j,i in enumerate(imgs):
             caption = captions[j]
-            # Preprocess images and captions 
-            vision_inputs = self.get_vision_preprocessing(i) 
-            if self.device == 'cuda':
-                vision_inputs = {k:v.cuda() for k,v in vision_inputs.items()}
             if j<8:
-                log_dict['original_images'].append(self.get_image(vision_inputs['pixel_values'].clone().cpu())) 
-            vision_inputs['pixel_values'] += self.v 
+                log_dict['original_images'].append(self.get_image(norm(deepcopy(i)).clone().cpu())) 
+            # Preprocess images and captions 
+            imgs = imgs + self.v*255
+            vision_inputs = { 'pixel_values': norm(i)}   
             vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, i, :, :], self.mins[i], self.maxes[i]) for i in range(3)], dim=1)
             if j<8:
                 log_dict['generations'].append(self.get_image(vision_inputs['pixel_values']))
@@ -283,7 +277,7 @@ class MaxEmbeddingTrainer(BaseTrainer):
         
         class_accuracies = np.mean(class_accuracies)
         log_dict['test_loss'] = loss.item()/len(imgs)
-        log_dict['v'] = [self.get_image(self.v.clone().cpu())] 
+        log_dict['v'] = [self.get_image(self.v.clone().cpu(),no_norm=True)] 
         log_dict['test classification accuracy'] = class_accuracies
         log_dict['Test-Average similarity with correct caption'] = np.mean(distances)
         self.logger.update(iter=self.curr_epoch,log_dict=log_dict) 
