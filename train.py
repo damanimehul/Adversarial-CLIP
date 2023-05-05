@@ -182,14 +182,15 @@ class TargetClassTrainer(BaseTrainer):
         class_accuracies, target_classified, target_dist, sim_dists = [] , [], [] , [] 
         for j,i in enumerate(imgs):
             caption = captions[j]
+            im = i
             if j<8:
-                log_dict['original_images'].append(self.get_image(self.norm(deepcopy(i)).clone().cpu())) 
+                log_dict['original_images'].append(self.get_image(self.norm(deepcopy(im)).clone().cpu())) 
             # Preprocess images and captions 
-            imgs = imgs + self.v*255
-            vision_inputs = { 'pixel_values': self.norm(i)}   
+            im = im + self.v*255
+            vision_inputs = { 'pixel_values': self.norm(im)}   
             vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, i, :, :], self.mins[i], self.maxes[i]) for i in range(3)], dim=1)
             if j<8:
-                log_dict['generations'].append(self.get_image(vision_inputs['pixel_values']))
+                log_dict['generations'].append(self.get_image(deepcopy(vision_inputs['pixel_values'])))
             vision_embeddings = self.get_vision_embeddings(vision_inputs)
             target_embeddings = self.target_embeddings.repeat(vision_embeddings.shape[0],1)
             loss += self.loss_criterion(vision_embeddings,target_embeddings) 
@@ -275,14 +276,15 @@ class MaxEmbeddingTrainer(BaseTrainer):
         class_accuracies, distances = [] , [] 
         for j,i in enumerate(imgs):
             caption = captions[j]
+            im = i
             if j<8:
-                log_dict['original_images'].append(self.get_image(self.norm(deepcopy(i)).clone().cpu())) 
+                log_dict['original_images'].append(self.get_image(self.norm(deepcopy(im)).clone().cpu())) 
             # Preprocess images and captions 
-            imgs = imgs + self.v*255
-            vision_inputs = { 'pixel_values': self.norm(i)}   
+            im = im + self.v*255
+            vision_inputs = { 'pixel_values': self.norm(im)}   
             vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, i, :, :], self.mins[i], self.maxes[i]) for i in range(3)], dim=1)
             if j<8:
-                log_dict['generations'].append(self.get_image(vision_inputs['pixel_values']))
+                log_dict['generations'].append(self.get_image(deepcopy(vision_inputs['pixel_values'])))
             vision_embeddings = self.get_vision_embeddings(vision_inputs)
             text_embedding = self.get_text_embeddings([caption])
             loss += self.loss_criterion(vision_embeddings,text_embedding) 
