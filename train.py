@@ -1,5 +1,5 @@
 import torch 
-from utils import MINS,MAXES,norm,denorm,process_img
+from utils import MINS,MAXES,MEANS, STDS,norm,denorm,process_img
 import numpy as np 
 from generate_dataset import MSCOCO_CLASSES
 from copy import deepcopy 
@@ -22,9 +22,24 @@ class BaseTrainer():
         self.epochs = epochs
         self.mins = MINS
         self.maxes = MAXES
+        self.means = MEANS
+        self.stds = STDS
         if self.device == 'cuda':
             self.mins = self.mins.cuda()
             self.maxes = self.maxes.cuda()
+            self.means = self.means.cuda()
+            self.stds = self.stds.cuda()
+
+    def norm(self,im): 
+        # Denormalize an image similar to clip-preprocessin
+        # if len(im.shape) ==4:
+        #     assert im.shape[0] ==1 
+        #     im = im.squeeze(dim=0) 
+        # new_im = (im/255 -  MEANS)/ STDS
+        im /= 255
+        im = (im - self.means.view(1, 1, 1, 3)) / self.stds.view(1, 1, 1, 3)
+        im = im.permute(0,3,1,2)
+        return im
 
     def train_setup(self):
         self.v = torch.zeros((224,224,3))
@@ -128,7 +143,7 @@ class TargetClassTrainer(BaseTrainer):
                 if self.device == 'cuda':
                     imgs = imgs.cuda()
                 imgs = imgs + self.v*255
-                vision_inputs = { 'pixel_values': norm(imgs)}  
+                vision_inputs = { 'pixel_values': self.norm(imgs)}  
                 vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, k, :, :], self.mins[k], self.maxes[k]) for k in range(3)], dim=1)
                 vision_embeddings = self.get_vision_embeddings(vision_inputs)
                 train_accuracy,target_accuracy,distance_to_target,sd = self.get_classification_accuracy(vision_embeddings,captions)
@@ -168,10 +183,10 @@ class TargetClassTrainer(BaseTrainer):
         for j,i in enumerate(imgs):
             caption = captions[j]
             if j<8:
-                log_dict['original_images'].append(self.get_image(norm(deepcopy(i)).clone().cpu())) 
+                log_dict['original_images'].append(self.get_image(self.norm(deepcopy(i)).clone().cpu())) 
             # Preprocess images and captions 
             imgs = imgs + self.v*255
-            vision_inputs = { 'pixel_values': norm(i)}   
+            vision_inputs = { 'pixel_values': self.norm(i)}   
             vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, i, :, :], self.mins[i], self.maxes[i]) for i in range(3)], dim=1)
             if j<8:
                 log_dict['generations'].append(self.get_image(vision_inputs['pixel_values']))
@@ -225,7 +240,7 @@ class MaxEmbeddingTrainer(BaseTrainer):
                 if self.device == 'cuda':
                     imgs = imgs.cuda()
                 imgs = imgs + self.v*255
-                vision_inputs = { 'pixel_values': norm(imgs)}  
+                vision_inputs = { 'pixel_values': self.norm(imgs)}  
                 vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, k, :, :], self.mins[k], self.maxes[k]) for k in range(3)], dim=1)
                 vision_embeddings = self.get_vision_embeddings(vision_inputs)
                 train_accuracy,dist = self.get_classification_accuracy(vision_embeddings,captions)
@@ -261,10 +276,10 @@ class MaxEmbeddingTrainer(BaseTrainer):
         for j,i in enumerate(imgs):
             caption = captions[j]
             if j<8:
-                log_dict['original_images'].append(self.get_image(norm(deepcopy(i)).clone().cpu())) 
+                log_dict['original_images'].append(self.get_image(self.norm(deepcopy(i)).clone().cpu())) 
             # Preprocess images and captions 
             imgs = imgs + self.v*255
-            vision_inputs = { 'pixel_values': norm(i)}   
+            vision_inputs = { 'pixel_values': self.norm(i)}   
             vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, i, :, :], self.mins[i], self.maxes[i]) for i in range(3)], dim=1)
             if j<8:
                 log_dict['generations'].append(self.get_image(vision_inputs['pixel_values']))
