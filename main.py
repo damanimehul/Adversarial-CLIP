@@ -24,6 +24,8 @@ if __name__=='__main__':
     parser.add_argument('--target_class',type=str,default='dog',help='Target class for training, only used in target_class_trainer')
     parser.add_argument('--log_freq',type=int,default=10,help='Log frequency for training')
     parser.add_argument('--device',type=str,default='cpu',help='Device to use for training')
+    parser.add_argument('--regularizer',type=str,default='none',help='Regularizer to use for training') 
+    parser.add_argument('--reg_weight',type=float,default=0.01,help='Regularizer weight to use for training')
 
     args = parser.parse_args() 
 
@@ -60,11 +62,11 @@ if __name__=='__main__':
         if args.trainer == 'target_class_trainer':
             trainer = TargetClassTrainer(device=args.device,dataloader=train_dataloader,test_dataloader=test_dataloader,logger=logger,text_model=text_model, visual_model=vision_model, 
                                          text_tokenizer=text_tokenizer, vision_processor=vision_processor,num_iters=args.num_iters,epochs=args.epochs,lr=args.lr,
-                                         log_freq=args.log_freq,target_class=args.target_class)
+                                         log_freq=args.log_freq,target_class=args.target_class,regularizer=args.regularizer,reg_weight=args.reg_weight)
         elif args.trainer == 'max_embedding_trainer':
             trainer = MaxEmbeddingTrainer(device=args.device,dataloader=train_dataloader,test_dataloader=test_dataloader,logger=logger,text_model=text_model, visual_model=vision_model, 
                                          text_tokenizer=text_tokenizer, vision_processor=vision_processor,num_iters=args.num_iters,epochs=args.epochs,lr=args.lr,
-                                         log_freq=args.log_freq)
+                                         log_freq=args.log_freq,regularizer=args.regularizer,reg_weight=args.reg_weight)
 
         perturbations = trainer.train()
         with open('results/{}/{}'.format(args.name,'v.pickle'), 'wb') as f:

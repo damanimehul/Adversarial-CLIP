@@ -6,7 +6,7 @@ from copy import deepcopy
 class BaseTrainer():
 
     def __init__(self,device,dataloader,test_dataloader,logger,text_model, visual_model, text_tokenizer, 
-                 vision_processor,num_iters,epochs,lr,log_freq):
+                 vision_processor,num_iters,epochs,lr,log_freq,regularizer,reg_weight):
         self.device = device
         self.text_model = text_model 
         self.visual_model = visual_model 
@@ -24,6 +24,8 @@ class BaseTrainer():
         self.maxes = MAXES
         self.means = MEANS
         self.stds = STDS
+        self.regularizer = regularizer
+        self.reg_weight = reg_weight
         if self.device == 'cuda':
             self.mins = self.mins.cuda()
             self.maxes = self.maxes.cuda()
@@ -103,9 +105,9 @@ class BaseTrainer():
 class TargetClassTrainer(BaseTrainer):
 
     def __init__(self, device,dataloader,test_dataloader,logger,text_model, visual_model, text_tokenizer, 
-                 vision_processor,num_iters,epochs,lr,log_freq,target_class='dog'):
+                 vision_processor,num_iters,epochs,lr,log_freq,regularizer,reg_weight,target_class='dog'):
         super().__init__(device,dataloader,test_dataloader,logger,text_model, visual_model, text_tokenizer, 
-                 vision_processor,num_iters,epochs,lr,log_freq)
+                 vision_processor,num_iters,epochs,lr,log_freq,regularizer,reg_weight)
         self.target_class = target_class
         self.target_class_index = MSCOCO_CLASSES.index(target_class)
         self.train_setup() 
@@ -149,6 +151,8 @@ class TargetClassTrainer(BaseTrainer):
                 train_accuracy,target_accuracy,distance_to_target,sd = self.get_classification_accuracy(vision_embeddings,captions)
                 target_embeddings = self.target_embeddings.repeat(vision_embeddings.shape[0],1)
                 loss = self.loss_criterion(vision_embeddings,target_embeddings)
+                if self.regularizer == 'l2':
+                    loss += self.reg_weight*torch.norm(self.v)**2
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
@@ -199,6 +203,8 @@ class TargetClassTrainer(BaseTrainer):
             target_classified.append(b)
             target_dist.append(c)
             sim_dists.append(d)
+        if self.regularizer == 'l2':
+                    loss += len(imgs)*self.reg_weight*torch.norm(self.v)**2
 
         class_accuracies = np.mean(class_accuracies)
         log_dict['test_loss'] = loss.item()/len(imgs)
@@ -213,9 +219,9 @@ class TargetClassTrainer(BaseTrainer):
 class MaxEmbeddingTrainer(BaseTrainer):
 
     def __init__(self, device,dataloader,test_dataloader,logger,text_model, visual_model, text_tokenizer, 
-                 vision_processor,num_iters,epochs,lr,log_freq):
+                 vision_processor,num_iters,epochs,lr,log_freq,regularizer,reg_weight):
         super().__init__(device,dataloader,test_dataloader,logger,text_model, visual_model, text_tokenizer, 
-                 vision_processor,num_iters,epochs,lr,log_freq)
+                 vision_processor,num_iters,epochs,lr,log_freq,regularizer,reg_weight)
         self.train_setup() 
 
     @torch.no_grad()
@@ -247,6 +253,8 @@ class MaxEmbeddingTrainer(BaseTrainer):
                 train_accuracy,dist = self.get_classification_accuracy(vision_embeddings,captions)
                 text_embeddings = self.get_text_embeddings(captions)
                 loss = -self.loss_criterion(vision_embeddings,text_embeddings)
+                if self.regularizer == 'l2':
+                    loss += self.reg_weight*torch.norm(self.v)**2
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
@@ -291,6 +299,8 @@ class MaxEmbeddingTrainer(BaseTrainer):
             a,b = self.get_classification_accuracy(vision_embeddings,[caption]) 
             class_accuracies.append(a)
             distances.append(b)
+        if self.regularizer == 'l2':
+                    loss += len(imgs)*self.reg_weight*torch.norm(self.v)**2
         
         class_accuracies = np.mean(class_accuracies)
         log_dict['test_loss'] = loss.item()/len(imgs)
