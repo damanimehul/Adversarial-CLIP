@@ -316,3 +316,128 @@ class MaxEmbeddingTrainer(BaseTrainer):
         log_dict['Test-Average similarity with correct caption'] = np.mean(distances)
         self.logger.update(iter=self.curr_epoch,log_dict=log_dict) 
         return class_accuracies
+    
+class MaxTargetProbTrainer(BaseTrainer):
+
+    def __init__(self, device,dataloader,test_dataloader,logger,text_model, visual_model, text_tokenizer, 
+                 vision_processor,num_iters,epochs,lr,log_freq,regularizer,reg_weight,target_class='dog',temperature=0):
+        super().__init__(device,dataloader,test_dataloader,logger,text_model, visual_model, text_tokenizer, 
+                 vision_processor,num_iters,epochs,lr,log_freq,regularizer,reg_weight)
+        self.target_class = target_class
+        self.target_class_index = MSCOCO_CLASSES.index(target_class)
+        self.temperature = temperature
+        self.train_setup() 
+
+    def train_setup(self):
+        super().train_setup()
+        input_caption = self.target_class
+        with torch.no_grad():
+            self.target_embeddings = self.get_text_embeddings([input_caption])[0]
+        self.loss_criterion = torch.nn.CrossEntropyLoss()
+
+    @torch.no_grad()
+    def get_classification_accuracy(self,vision_embeddings,captions):
+        vision_embeddings /= torch.norm(vision_embeddings,dim=1).unsqueeze(1)
+        dot_products = torch.transpose(torch.matmul(self.norm_embeddings,torch.transpose(vision_embeddings,0,1)),0,1) 
+        maxes = torch.argmax(dot_products,dim=1)
+        maxes = maxes.cpu().numpy()
+        caption_labels = np.array([MSCOCO_CLASSES.index(i) for i in captions]) 
+        flags = np.equal(maxes,caption_labels) 
+        accuracy = np.sum(flags)/len(flags)
+        #Count number of appearences of target class in batch
+        target_class_count = np.sum(np.equal(maxes,self.target_class_index))
+        # Average distance to target class embedding 
+        target_dists = dot_products[:,self.target_class_index].cpu().numpy()
+        out = dot_products[np.arange(dot_products.shape[0]),caption_labels] 
+        return accuracy, target_class_count, np.mean(target_dists), torch.mean(out).item()
+
+    def train(self): 
+        perturbs = {} 
+        for i in range(self.epochs): 
+            losses,train_accuracies,target_accuracies,distance_to_targets,similarity_dists = [],[],[],[],[] 
+            for j in range(self.num_iters):
+                # Get a batch of images and captions 
+                batch = next(iter(self.dataloader))
+                imgs,captions = batch
+                if self.device == 'cuda':
+                    imgs = imgs.cuda()
+                imgs = imgs + self.v*255
+                vision_inputs = { 'pixel_values': self.norm(imgs)}  
+                vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, k, :, :], self.mins[k], self.maxes[k]) for k in range(3)], dim=1)
+                vision_embeddings = self.get_vision_embeddings(vision_inputs)
+                norm_val = torch.norm(vision_embeddings.detach().clone(),dim=1).unsqueeze(1)
+                norm_embeddings = vision_embeddings/norm_val
+                logits = torch.transpose(torch.matmul(self.norm_embeddings,torch.transpose(norm_embeddings,0,1)),0,1) * np.exp(self.temperature)
+                target = torch.tensor(self.target_class_index).repeat(logits.shape[0]).long()
+                train_accuracy,target_accuracy,distance_to_target,sd = self.get_classification_accuracy(vision_embeddings,captions)
+                loss = self.loss_criterion(logits,target)
+                if self.regularizer == 'l2':
+                    loss += self.reg_weight*torch.norm(self.v)**2
+                elif self.regularizer =='tvr':
+                    loss += self.reg_weight*tv_regularization(self.v) 
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+                losses.append(loss.item())
+                train_accuracies.append(train_accuracy)
+                target_accuracies.append(target_accuracy)
+                distance_to_targets.append(distance_to_target)
+                similarity_dists.append(sd)
+                self.curr_iter +=1
+            self.logger.update(iter=self.curr_epoch,log_dict={'loss':np.mean(losses),'train classification accuracy':np.mean(train_accuracies), 
+                                                              'Classified as target':np.mean(target_accuracies), 'Average similarity with target':np.mean(distance_to_targets),
+                                                              'Average similarity with correct caption':np.mean(similarity_dists)})
+            if i % self.log_freq == 0:
+                test_accuracy = self.evaluate() 
+                print(f'Epoch {i} loss: {loss.item()} train classification accuracy: {100*np.round(np.mean(train_accuracies),2)}% test classification accuracy: {100*np.round(test_accuracy,2)}%')
+                v = self.v.clone().detach().cpu().numpy()
+                perturbs[self.curr_epoch] = v
+                self.logger.update(iter=self.curr_epoch,log_dict={'norm v':np.linalg.norm(v.flatten()),'test classification accuracy':test_accuracy})
+            self.curr_epoch +=1
+
+        return perturbs
+
+    @torch.no_grad()
+    def evaluate(self):
+        batch = next(iter(self.test_dataloader))
+        imgs,captions = batch
+        if self.device == 'cuda':
+            imgs = imgs.cuda()
+        loss = 0 
+        log_dict = {'original_images':[],'generations':[]} 
+        class_accuracies, target_classified, target_dist, sim_dists = [] , [], [] , [] 
+        for j,i in enumerate(imgs):
+            caption = captions[j]
+            im = i
+            if j<8:
+                log_dict['original_images'].append(self.get_image(self.norm(deepcopy(im)).clone().cpu())) 
+            # Preprocess images and captions 
+            im = im + self.v*255
+            vision_inputs = { 'pixel_values': self.norm(im)}   
+            vision_inputs['pixel_values'] = torch.stack([torch.clamp(vision_inputs['pixel_values'][:, i, :, :], self.mins[i], self.maxes[i]) for i in range(3)], dim=1)
+            if j<8:
+                log_dict['generations'].append(self.get_image(deepcopy(vision_inputs['pixel_values'])))
+            vision_embeddings = self.get_vision_embeddings(vision_inputs)
+            norm_val = torch.norm(vision_embeddings.detach().clone(),dim=1).unsqueeze(1)
+            norm_embeddings = vision_embeddings/norm_val
+            logits = torch.transpose(torch.matmul(self.norm_embeddings,torch.transpose(norm_embeddings,0,1)),0,1)  * np.exp(self.temperature)
+            target = torch.tensor(self.target_class_index).repeat(logits.shape[0]).long()
+            loss += self.loss_criterion(logits,target) 
+            a,b,c,d = self.get_classification_accuracy(vision_embeddings,[caption]) 
+            class_accuracies.append(a)
+            target_classified.append(b)
+            target_dist.append(c)
+            sim_dists.append(d)
+        if self.regularizer == 'l2':
+                    loss += len(imgs)*self.reg_weight*torch.norm(self.v)**2
+        elif self.regularizer =='tvr':
+                    loss += len(imgs)*self.reg_weight*tv_regularization(self.v) 
+        class_accuracies = np.mean(class_accuracies)
+        log_dict['test_loss'] = loss.item()/len(imgs)
+        log_dict['v'] = [self.get_image(self.v.clone().cpu(),no_norm=True)] 
+        log_dict['test classification accuracy'] = class_accuracies
+        log_dict['Test-Classified as target'] = np.mean(target_classified)
+        log_dict['Test-Average similarity with target'] = np.mean(target_dist)
+        log_dict['Test-Average similarity with correct caption'] = np.mean(sim_dists)
+        self.logger.update(iter=self.curr_epoch,log_dict=log_dict) 
+        return class_accuracies

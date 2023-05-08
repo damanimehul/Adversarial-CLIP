@@ -1,0 +1,2 @@
+CUDA_VISIBLE_DEVICES=1 python main.py --name class-temp-dog-5000-lr1e-1 --wandb  --device cuda --dataset 5000 --log_freq 25 --lr 1e-1 --epochs 1000 --batch_size 128 --target_class dog --trainer max_target_prob --temperature 2.6592 
+CUDA_VISIBLE_DEVICES=1 python main.py --name class-temp-dog-5000-lr1e-3 --wandb  --device cuda --dataset 5000 --log_freq 25 --lr 1e-3 --epochs 1000 --batch_size 128 --target_class dog --trainer max_target_prob --temperature 2.6592

@@ -1,7 +1,7 @@
 import argparse 
 import torch 
 from generate_dataset import load_dataset, make_dataset, ImageCaptionDataset
-from train import TargetClassTrainer, MaxEmbeddingTrainer
+from train import TargetClassTrainer, MaxEmbeddingTrainer, MaxTargetProbTrainer
 from utils import WandbLogger, preprocess_dataset
 from transformers import AutoTokenizer,AutoProcessor,CLIPTextModelWithProjection,CLIPVisionModelWithProjection
 import os 
@@ -26,6 +26,7 @@ if __name__=='__main__':
     parser.add_argument('--device',type=str,default='cpu',help='Device to use for training')
     parser.add_argument('--regularizer',type=str,default='none',help='Regularizer to use for training') 
     parser.add_argument('--reg_weight',type=float,default=0.01,help='Regularizer weight to use for training')
+    parser.add_argument('--temperature',type=float,default=0,help='Temperature to scale raw logits')
 
     args = parser.parse_args() 
 
@@ -67,6 +68,11 @@ if __name__=='__main__':
             trainer = MaxEmbeddingTrainer(device=args.device,dataloader=train_dataloader,test_dataloader=test_dataloader,logger=logger,text_model=text_model, visual_model=vision_model, 
                                          text_tokenizer=text_tokenizer, vision_processor=vision_processor,num_iters=args.num_iters,epochs=args.epochs,lr=args.lr,
                                          log_freq=args.log_freq,regularizer=args.regularizer,reg_weight=args.reg_weight)
+
+        elif args.trainer == 'max_target_prob':
+            trainer = MaxTargetProbTrainer(device=args.device,dataloader=train_dataloader,test_dataloader=test_dataloader,logger=logger,text_model=text_model, visual_model=vision_model, 
+                                         text_tokenizer=text_tokenizer, vision_processor=vision_processor,num_iters=args.num_iters,epochs=args.epochs,lr=args.lr,
+                                         log_freq=args.log_freq,target_class=args.target_class,regularizer=args.regularizer,reg_weight=args.reg_weight,temperature=args.temperature)
 
         perturbations = trainer.train()
         with open('results/{}/{}'.format(args.name,'v.pickle'), 'wb') as f:
