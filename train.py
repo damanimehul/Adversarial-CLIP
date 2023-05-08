@@ -369,6 +369,8 @@ class MaxTargetProbTrainer(BaseTrainer):
                 norm_embeddings = vision_embeddings/norm_val
                 logits = torch.transpose(torch.matmul(self.norm_embeddings,torch.transpose(norm_embeddings,0,1)),0,1) * np.exp(self.temperature)
                 target = torch.tensor(self.target_class_index).repeat(logits.shape[0]).long()
+                if self.device == 'cuda':
+                    target = target.cuda()
                 train_accuracy,target_accuracy,distance_to_target,sd = self.get_classification_accuracy(vision_embeddings,captions)
                 loss = self.loss_criterion(logits,target)
                 if self.regularizer == 'l2':
@@ -422,6 +424,8 @@ class MaxTargetProbTrainer(BaseTrainer):
             norm_embeddings = vision_embeddings/norm_val
             logits = torch.transpose(torch.matmul(self.norm_embeddings,torch.transpose(norm_embeddings,0,1)),0,1)  * np.exp(self.temperature)
             target = torch.tensor(self.target_class_index).repeat(logits.shape[0]).long()
+            if self.device == 'cuda':
+                target = target.cuda()
             loss += self.loss_criterion(logits,target) 
             a,b,c,d = self.get_classification_accuracy(vision_embeddings,[caption]) 
             class_accuracies.append(a)
