@@ -1,5 +1,5 @@
 import torch 
-from utils import MINS,MAXES,MEANS, STDS,norm,denorm,process_img
+from utils import MINS,MAXES,MEANS, STDS,norm,denorm,process_img,tv_regularization
 import numpy as np 
 from generate_dataset import MSCOCO_CLASSES
 from copy import deepcopy 
@@ -153,6 +153,8 @@ class TargetClassTrainer(BaseTrainer):
                 loss = self.loss_criterion(vision_embeddings,target_embeddings)
                 if self.regularizer == 'l2':
                     loss += self.reg_weight*torch.norm(self.v)**2
+                elif self.regularizer =='tvr':
+                    loss += self.reg_weight*tv_regularization(self.v) 
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
@@ -205,7 +207,8 @@ class TargetClassTrainer(BaseTrainer):
             sim_dists.append(d)
         if self.regularizer == 'l2':
                     loss += len(imgs)*self.reg_weight*torch.norm(self.v)**2
-
+        elif self.regularizer =='tvr':
+                    loss += len(imgs)*self.reg_weight*tv_regularization(self.v) 
         class_accuracies = np.mean(class_accuracies)
         log_dict['test_loss'] = loss.item()/len(imgs)
         log_dict['v'] = [self.get_image(self.v.clone().cpu(),no_norm=True)] 
@@ -255,6 +258,8 @@ class MaxEmbeddingTrainer(BaseTrainer):
                 loss = -self.loss_criterion(vision_embeddings,text_embeddings)
                 if self.regularizer == 'l2':
                     loss += self.reg_weight*torch.norm(self.v)**2
+                elif self.regularizer =='tvr':
+                    loss += self.reg_weight*tv_regularization(self.v) 
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
@@ -301,6 +306,8 @@ class MaxEmbeddingTrainer(BaseTrainer):
             distances.append(b)
         if self.regularizer == 'l2':
                     loss += len(imgs)*self.reg_weight*torch.norm(self.v)**2
+        elif self.regularizer =='tvr':
+                    loss += len(imgs)*self.reg_weight*tv_regularization(self.v) 
         
         class_accuracies = np.mean(class_accuracies)
         log_dict['test_loss'] = loss.item()/len(imgs)

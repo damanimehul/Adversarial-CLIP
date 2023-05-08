@@ -121,3 +121,8 @@ def preprocess_dataset(train_data,test_data):
     print('Removed empty Images due to NSFW filter, New Train Data Size',len(train_data)) 
     print('Removed empty Images due to NSFW filter, New Test Data Size',len(test_data))
     return train_data,test_data
+
+def tv_regularization(tensor):
+    tv_h = torch.pow(tensor[1:, :, :] - tensor[:-1, :, :], 2).sum()
+    tv_w = torch.pow(tensor[:, 1:, :] - tensor[:, :-1, :], 2).sum()
+    return tv_h + tv_w
