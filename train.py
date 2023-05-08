@@ -153,6 +153,8 @@ class TargetClassTrainer(BaseTrainer):
                 loss = self.loss_criterion(vision_embeddings,target_embeddings)
                 if self.regularizer == 'l2':
                     loss += self.reg_weight*torch.norm(self.v)**2
+                elif self.regularizer =='l1':
+                    loss += self.reg_weight*torch.norm(self.v,p=1)
                 elif self.regularizer =='tvr':
                     loss += self.reg_weight*tv_regularization(self.v) 
                 loss.backward()
@@ -207,6 +209,8 @@ class TargetClassTrainer(BaseTrainer):
             sim_dists.append(d)
         if self.regularizer == 'l2':
                     loss += len(imgs)*self.reg_weight*torch.norm(self.v)**2
+        elif self.regularizer =='l1':
+                    loss += len(imgs)*self.reg_weight*torch.norm(self.v,p=1)
         elif self.regularizer =='tvr':
                     loss += len(imgs)*self.reg_weight*tv_regularization(self.v) 
         class_accuracies = np.mean(class_accuracies)
@@ -258,6 +262,8 @@ class MaxEmbeddingTrainer(BaseTrainer):
                 loss = -self.loss_criterion(vision_embeddings,text_embeddings)
                 if self.regularizer == 'l2':
                     loss += self.reg_weight*torch.norm(self.v)**2
+                elif self.regularizer =='l1':
+                    loss += self.reg_weight*torch.norm(self.v,p=1)
                 elif self.regularizer =='tvr':
                     loss += self.reg_weight*tv_regularization(self.v) 
                 loss.backward()
@@ -306,6 +312,8 @@ class MaxEmbeddingTrainer(BaseTrainer):
             distances.append(b)
         if self.regularizer == 'l2':
                     loss += len(imgs)*self.reg_weight*torch.norm(self.v)**2
+        elif self.regularizer =='l1':
+                    loss += len(imgs)*self.reg_weight*torch.norm(self.v,p=1)
         elif self.regularizer =='tvr':
                     loss += len(imgs)*self.reg_weight*tv_regularization(self.v) 
         
@@ -375,6 +383,8 @@ class MaxTargetProbTrainer(BaseTrainer):
                 loss = self.loss_criterion(logits,target)
                 if self.regularizer == 'l2':
                     loss += self.reg_weight*torch.norm(self.v)**2
+                elif self.regularizer =='l1':
+                    loss += self.reg_weight*torch.norm(self.v,p=1)
                 elif self.regularizer =='tvr':
                     loss += self.reg_weight*tv_regularization(self.v) 
                 loss.backward()
@@ -434,6 +444,8 @@ class MaxTargetProbTrainer(BaseTrainer):
             sim_dists.append(d)
         if self.regularizer == 'l2':
                     loss += len(imgs)*self.reg_weight*torch.norm(self.v)**2
+        elif self.regularizer =='l1':
+                    loss += len(imgs)*self.reg_weight*torch.norm(self.v,p=1)
         elif self.regularizer =='tvr':
                     loss += len(imgs)*self.reg_weight*tv_regularization(self.v) 
         class_accuracies = np.mean(class_accuracies)
