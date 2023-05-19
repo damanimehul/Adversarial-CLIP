@@ -18,7 +18,7 @@ MSCOCO_CLASSES = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', '
                   'dining table', 'window', 'desk', 'toilet', 'door', 'tv', 'laptop', 'mouse', 
                   'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
                   'refrigerator', 'blender', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 
-                  'hair drier', 'toothbrush', 'piggy bank','jarm']
+                  'hair drier', 'toothbrush', 'piggy bank','jarm','terrorist']
 
 class ImageCaptionDataset(Dataset):
     def __init__(self, data):
